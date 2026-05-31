@@ -1,4 +1,7 @@
 # Numa
+<p align="center">
+  <b>English</b> | <a href="./README_zh.md">中文</a>
+</p>
 
 [![CI](https://github.com/razvandimescu/numa/actions/workflows/ci.yml/badge.svg)](https://github.com/razvandimescu/numa/actions)
 [![crates.io](https://img.shields.io/crates/v/numa.svg)](https://crates.io/crates/numa)
@@ -43,11 +46,11 @@ Open the dashboard: **http://numa.numa** (or `http://localhost:5380`)
 
 Set as system DNS:
 
-| Platform | Install | Uninstall |
-|----------|---------|-----------|
-| macOS | `sudo numa install` | `sudo numa uninstall` |
-| Linux | `sudo numa install` | `sudo numa uninstall` |
-| Windows | `numa install` (admin) + reboot | `numa uninstall` (admin) + reboot |
+| Platform | Install                         | Uninstall                         |
+| -------- | ------------------------------- | --------------------------------- |
+| macOS    | `sudo numa install`             | `sudo numa uninstall`             |
+| Linux    | `sudo numa install`             | `sudo numa uninstall`             |
+| Windows  | `numa install` (admin) + reboot | `numa uninstall` (admin) + reboot |
 
 On macOS and Linux, numa runs as a system service (launchd/systemd). On Windows, numa auto-starts on login via registry. Windows also binds `127.0.0.2:53` (the built-in Dnscache owns `127.0.0.1:53`) and installs an NRPT rule to route queries to it — so edit `bind_addr`/`api_bind_addr` against `127.0.0.2`, not `127.0.0.1`.
 
@@ -134,23 +137,23 @@ Turnkey compose recipes:
 
 ## How It Compares
 
-| | Pi-hole | AdGuard Home | Unbound | Numa |
-|---|---|---|---|---|
-| Local service proxy + auto TLS | — | — | — | `.numa` domains, HTTPS, WebSocket |
-| LAN service discovery | — | — | — | mDNS, zero config |
-| Developer overrides (REST API) | — | — | — | Auto-revert, scriptable |
-| Recursive resolver | — | — | Yes | Yes, with SRTT selection |
-| DNSSEC validation | — | — | Yes | Yes (RSA, ECDSA, Ed25519) |
-| Ad blocking | Yes | Yes | — | 385K+ domains |
-| Web admin UI | Full | Full | — | Dashboard |
-| Encrypted upstream (DoH/DoT) | Needs cloudflared | DoH only | DoT only | DoH + DoT (`tls://`) |
-| Encrypted clients (DoT listener) | Needs stunnel sidecar | Yes | Yes | Native (RFC 7858) |
-| DoH server endpoint | — | Yes | — | Yes (RFC 8484) |
-| Request hedging | — | — | — | All protocols (UDP, DoH, DoT) |
-| Serve-stale + prefetch | — | — | Prefetch at 90% TTL | RFC 8767, prefetch at 90% TTL |
-| Conditional forwarding | — | Yes | Yes | Yes (per-suffix rules) |
-| Portable (laptop) | No (appliance) | No (appliance) | Server | Single binary, macOS/Linux/Windows |
-| Community maturity | 56K stars, 10 years | 33K stars | 20 years | New |
+|                                  | Pi-hole               | AdGuard Home   | Unbound             | Numa                               |
+| -------------------------------- | --------------------- | -------------- | ------------------- | ---------------------------------- |
+| Local service proxy + auto TLS   | —                     | —              | —                   | `.numa` domains, HTTPS, WebSocket  |
+| LAN service discovery            | —                     | —              | —                   | mDNS, zero config                  |
+| Developer overrides (REST API)   | —                     | —              | —                   | Auto-revert, scriptable            |
+| Recursive resolver               | —                     | —              | Yes                 | Yes, with SRTT selection           |
+| DNSSEC validation                | —                     | —              | Yes                 | Yes (RSA, ECDSA, Ed25519)          |
+| Ad blocking                      | Yes                   | Yes            | —                   | 385K+ domains                      |
+| Web admin UI                     | Full                  | Full           | —                   | Dashboard                          |
+| Encrypted upstream (DoH/DoT)     | Needs cloudflared     | DoH only       | DoT only            | DoH + DoT (`tls://`)               |
+| Encrypted clients (DoT listener) | Needs stunnel sidecar | Yes            | Yes                 | Native (RFC 7858)                  |
+| DoH server endpoint              | —                     | Yes            | —                   | Yes (RFC 8484)                     |
+| Request hedging                  | —                     | —              | —                   | All protocols (UDP, DoH, DoT)      |
+| Serve-stale + prefetch           | —                     | —              | Prefetch at 90% TTL | RFC 8767, prefetch at 90% TTL      |
+| Conditional forwarding           | —                     | Yes            | Yes                 | Yes (per-suffix rules)             |
+| Portable (laptop)                | No (appliance)        | No (appliance) | Server              | Single binary, macOS/Linux/Windows |
+| Community maturity               | 56K stars, 10 years   | 33K stars      | 20 years            | New                                |
 
 ## Performance
 
