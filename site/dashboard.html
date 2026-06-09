@@ -1128,9 +1128,9 @@ function applyLogFilter() {
 
   tbody.innerHTML = filtered.map(e => {
     const allowBtn = e.path === 'BLOCKED'
-      ? ` <button class="btn-delete" onclick="allowDomain('${e.domain}')" title="Allow this domain" style="color:var(--emerald);font-size:0.65rem;">allow</button>`
+      ? ` <button class="btn-delete" onclick="postDomain('/blocking/allowlist','${e.domain}')" title="Allow this domain" style="color:var(--emerald);font-size:0.65rem;">allow</button>`
       : e.rebind_stripped
-      ? ` <button class="btn-delete" onclick="allowRebind('${e.domain}')" title="Stop stripping private IPs for this domain" style="color:var(--emerald);font-size:0.65rem;">allow</button>`
+      ? ` <button class="btn-delete" onclick="postDomain('/rebind/allowlist','${e.domain}')" title="Stop stripping private IPs for this domain" style="color:var(--emerald);font-size:0.65rem;">allow</button>`
       : '';
     const rebindTag = e.rebind_stripped
       ? ` <span class="path-tag" style="background:rgba(192,98,58,0.12);color:var(--amber-dim);" title="Private IPs stripped by rebind protection">stripped</span>`
@@ -1391,26 +1391,18 @@ async function unpauseBlocking() {
   } catch (err) {}
 }
 
-async function allowDomain(domain) {
+async function postDomain(path, domain) {
   try {
-    await fetch(API + '/blocking/allowlist', {
+    await fetch(API + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ domain: domain }),
+      body: JSON.stringify({ domain }),
     });
     refresh();
-  } catch (err) {}
-}
-
-async function allowRebind(domain) {
-  try {
-    await fetch(API + '/rebind/allowlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ domain: domain }),
-    });
-    refresh();
-  } catch (err) {}
+    return true;
+  } catch (err) {
+    return false;
+  }
 }
 
 async function checkDomain(event) {
@@ -1425,7 +1417,7 @@ async function checkDomain(event) {
       el.className = 'check-result-blocked';
       el.innerHTML = `<strong>Blocked</strong> — ${h(result.reason)}` +
         (result.matched_rule ? `<br>Rule: <code>${h(result.matched_rule)}</code>` : '') +
-        ` <button class="btn-delete" onclick="allowDomain('${h(domain)}')" style="color:var(--emerald);font-size:0.7rem;margin-left:0.4rem;">allow</button>`;
+        ` <button class="btn-delete" onclick="postDomain('/blocking/allowlist','${h(domain)}')" style="color:var(--emerald);font-size:0.7rem;margin-left:0.4rem;">allow</button>`;
     } else {
       el.className = 'check-result-allowed';
       el.innerHTML = `<strong>Allowed</strong> — ${h(result.reason)}` +
@@ -1499,16 +1491,7 @@ async function addAllowlistDomain(event) {
   event.preventDefault();
   const input = document.getElementById('allowDomainInput');
   const domain = input.value.trim();
-  if (!domain) return false;
-  try {
-    await fetch(API + '/blocking/allowlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ domain }),
-    });
-    input.value = '';
-    refresh();
-  } catch (err) {}
+  if (domain && (await postDomain('/blocking/allowlist', domain))) input.value = '';
   return false;
 }
 
