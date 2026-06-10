@@ -21,8 +21,10 @@ const DEFAULT_RANGES: &[&str] = &[
     "172.16.0.0/12",  // RFC 1918
     "192.168.0.0/16", // RFC 1918
     "169.254.0.0/16", // RFC 3927 link-local
+    "100.64.0.0/10",  // RFC 6598 CGNAT — also Tailscale's address space
     "0.0.0.0/8",      // RFC 1122 "this host" — 0.0.0.0 routes to localhost on connect
     "fc00::/7",       // RFC 4193 ULA
+    "64:ff9b::/96",   // RFC 6052 NAT64 — synthesized addrs route to embedded v4
     "fe80::/10",      // RFC 4291 link-local
     "::1/128",        // loopback
     "::/128",         // unspecified
@@ -94,33 +96,40 @@ impl RebindFilter {
             return 0;
         }
         let is_private = |ip: IpAddr| self.ranges.matches(ip);
-
-        let before = response.answers.len();
-        response.answers.retain(|r| match r {
-            DnsRecord::A { addr, .. } => !is_private(IpAddr::V4(*addr)),
-            DnsRecord::AAAA { addr, .. } => !is_private(IpAddr::V6(*addr)),
-            _ => true,
-        });
-        let mut acted = before - response.answers.len();
-
-        let https = QueryType::HTTPS.to_num();
-        let svcb = QueryType::SVCB.to_num();
-        for rec in &mut response.answers {
-            if let DnsRecord::UNKNOWN { qtype, data, .. } = rec {
-                if *qtype == https || *qtype == svcb {
-                    if let Some(scrubbed) = crate::svcb::strip_private_hints(data, is_private) {
-                        *data = scrubbed;
-                        acted += 1;
-                    }
-                }
-            }
-        }
-        acted
+        // Authority/additional too: glue with private addresses is just as
+        // actionable to a credulous stub as an answer record.
+        scrub_section(&mut response.answers, &is_private)
+            + scrub_section(&mut response.authorities, &is_private)
+            + scrub_section(&mut response.resources, &is_private)
     }
 
     fn is_allowed(&self, qname: &str) -> bool {
         !self.allowlist.is_empty() && self.allowlist.matches(qname)
     }
+}
+
+fn scrub_section(records: &mut Vec<DnsRecord>, is_private: &impl Fn(IpAddr) -> bool) -> usize {
+    let before = records.len();
+    records.retain(|r| match r {
+        DnsRecord::A { addr, .. } => !is_private(IpAddr::V4(*addr)),
+        DnsRecord::AAAA { addr, .. } => !is_private(IpAddr::V6(*addr)),
+        _ => true,
+    });
+    let mut acted = before - records.len();
+
+    let https = QueryType::HTTPS.to_num();
+    let svcb = QueryType::SVCB.to_num();
+    for rec in records.iter_mut() {
+        if let DnsRecord::UNKNOWN { qtype, data, .. } = rec {
+            if *qtype == https || *qtype == svcb {
+                if let Some(scrubbed) = crate::svcb::strip_private_hints(data, is_private) {
+                    *data = scrubbed;
+                    acted += 1;
+                }
+            }
+        }
+    }
+    acted
 }
 
 #[cfg(test)]
@@ -242,6 +251,33 @@ mod tests {
         .unwrap();
         let r = run(&f, "evil.com", vec![a("192.168.1.1"), aaaa("fd00::1")]);
         assert_eq!(r, (1, vec![a("192.168.1.1")]));
+    }
+
+    #[test]
+    fn strips_cgnat_and_nat64() {
+        // 100.64/10: rebinding to a CGNAT/Tailscale address reaches tailnet
+        // services; 64:ff9b::/96: NAT64 synthesis routes to the embedded
+        // private v4 (64:ff9b::c0a8:101 -> 192.168.1.1).
+        let r = strip(vec![
+            a("100.100.1.1"),
+            aaaa("64:ff9b::c0a8:101"),
+            a("8.8.8.8"),
+        ]);
+        assert_eq!(r, (2, vec![a("8.8.8.8")]));
+    }
+
+    #[test]
+    fn scrubs_authority_and_additional_sections() {
+        let f = filter(&[]);
+        let mut p = DnsPacket::new();
+        p.answers.push(a("1.1.1.1"));
+        p.authorities.push(a("192.168.1.1"));
+        p.resources.push(aaaa("fd00::1"));
+        p.resources.push(a("8.8.8.8"));
+        assert_eq!(f.apply("evil.com", &mut p), 2);
+        assert!(p.authorities.is_empty());
+        assert_eq!(p.resources, vec![a("8.8.8.8")]);
+        assert_eq!(p.answers.len(), 1, "public answer untouched");
     }
 
     #[test]
